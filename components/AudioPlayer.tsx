@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Transcription from './transcription';
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
+import { TranscriptionSegment } from '@/types/transcription';
 import {
   Play,
   Pause,
@@ -9,23 +10,32 @@ import {
   SkipForward,
   Volume2,
   VolumeX,
-  Repeat,
-  Shuffle
 } from 'lucide-react';
 
 interface AudioPlayerProps {
   file: string | null;
+  onReset: () => void;
+  segments: TranscriptionSegment[];
 }
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({ file, onReset, segments } : any) => {
-  if (!file) return null;
+const AudioPlayer: React.FC<AudioPlayerProps> = ({ file, onReset, segments }) => {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [duration, setDuration] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const currentAudioRef = audioRef.current;
+    return () => {
+      if (currentAudioRef) {
+        currentAudioRef.pause();
+      }
+    };
+  }, []);
+
+  if (!file) return null;
 
   const formatTime = (time: number): string => {
     const minutes = Math.floor(time / 60);
@@ -49,7 +59,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file, onReset, segments } : a
 
     audioRef.current.play();
     setIsPlaying(true);
-  }
+  };
 
   const handleTimeUpdate = (): void => {
     if (!audioRef.current) return;
@@ -87,26 +97,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ file, onReset, segments } : a
   };
 
   const finish = () => {
-    if (!audioRef?.current) return;
+    if (!audioRef.current) return;
     const duration = audioRef.current.duration;
     audioRef.current.currentTime = duration;
     setCurrentTime(duration);
-  }
+  };
 
   const startOver = () => {
-    if (!audioRef?.current) return;
+    if (!audioRef.current) return;
     audioRef.current.currentTime = 0;
     setCurrentTime(0);
-  }
-
-  // Clean up effect
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-    };
-  }, []);
+  };
 
   return (
     <>

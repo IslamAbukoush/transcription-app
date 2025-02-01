@@ -30,12 +30,7 @@ export async function POST(request: NextRequest) {
     const tempFilePath = `/tmp/${audioFile.name}`
     
     // Write the buffer to a temporary file
-    await new Promise((resolve, reject) => {
-      require('fs').writeFile(tempFilePath, buffer, (err: any) => {
-        if (err) reject(err)
-        else resolve(true)
-      })
-    })
+    await fs.promises.writeFile(tempFilePath, buffer)
 
     // Call Groq API for transcription
     const transcription = await groq.audio.transcriptions.create({
@@ -48,14 +43,14 @@ export async function POST(request: NextRequest) {
     console.log(transcription);
 
     // Clean up the temporary file
-    fs.unlink(tempFilePath, (err: any) => {
-      if (err) console.error('Error cleaning up temp file:', err)
-    })
+    await fs.promises.unlink(tempFilePath).catch((err) => {
+      console.error('Error cleaning up temp file:', err);
+    });
 
     // Return the transcription
     return NextResponse.json({
       success: true,
-      // @ts-ignore
+      // @ts-expect-error - The Groq API response is not typed
       segments: transcription.segments
     })
 
