@@ -1,101 +1,214 @@
-import Image from "next/image";
+'use client'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Upload, Loader2 } from 'lucide-react'
+import { useToast } from "@/hooks/use-toast"
+import AudioPlayer from '@/components/AudioPlayer'
+import { TranscriptionSegment } from '@/types/transcription'
 
-export default function Home() {
+export default function UploadPage() {
+  const { toast } = useToast()
+  const [file, setFile] = useState<File | null>(null)
+  const [language, setLanguage] = useState('en')
+  const [isDragging, setIsDragging] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [segments, setSegments] = useState<TranscriptionSegment[] | null>(null)
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+
+    const droppedFile = e.dataTransfer.files[0]
+    if (droppedFile?.type.startsWith('audio/')) {
+      setFile(droppedFile)
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Invalid file type",
+        description: "Please upload an audio file."
+      })
+    }
+  }
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile?.type.startsWith('audio/')) {
+      setFile(selectedFile)
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Invalid file type",
+        description: "Please upload an audio file."
+      })
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (!file) return
+
+    setIsLoading(true)
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('language', language)
+
+    try {
+      const response = await fetch('/api', {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Transcription failed')
+      }
+      console.log(data)
+      console.log("GOT IT")
+      setSegments(data.segments)
+    } catch (error) {
+      console.error('Error uploading file:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to transcribe audio"
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (segments) {
+    return <AudioPlayer
+        segments={segments}
+        onReset={() => setSegments(null)}
+        file={file ? URL.createObjectURL(file) : null}
+      />
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="container mx-auto p-8">
+      <Card className="max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle>Audio Transcription</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault()
+              setIsDragging(true)
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed rounded-lg p-8 text-center ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+              }`}
+          >
+            <Upload className="mx-auto h-12 w-12 text-gray-400" />
+            <p className="mt-2 text-sm text-gray-600">
+              Drag and drop your audio file here, or
+              <label className="mx-2 text-blue-500 hover:text-blue-600 cursor-pointer">
+                browse
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".flac, .mp3, .mp4, .mpeg, .mpga, .m4a, .ogg, .wav, .webm"
+                  onChange={handleFileInput}
+                  disabled={isLoading}
+                />
+              </label>
+            </p>
+            {file && (
+              <p className="mt-2 text-sm text-green-600">
+                Selected: {file.name}
+              </p>
+            )}
+          </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Transcription Language</label>
+            <Select value={language} onValueChange={setLanguage} disabled={isLoading}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select language" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="af">Afrikaans</SelectItem>
+                <SelectItem value="ar">Arabic</SelectItem>
+                <SelectItem value="hy">Armenian</SelectItem>
+                <SelectItem value="az">Azerbaijani</SelectItem>
+                <SelectItem value="be">Belarusian</SelectItem>
+                <SelectItem value="bs">Bosnian</SelectItem>
+                <SelectItem value="bg">Bulgarian</SelectItem>
+                <SelectItem value="ca">Catalan</SelectItem>
+                <SelectItem value="zh">Chinese</SelectItem>
+                <SelectItem value="hr">Croatian</SelectItem>
+                <SelectItem value="cs">Czech</SelectItem>
+                <SelectItem value="da">Danish</SelectItem>
+                <SelectItem value="nl">Dutch</SelectItem>
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="et">Estonian</SelectItem>
+                <SelectItem value="fi">Finnish</SelectItem>
+                <SelectItem value="fr">French</SelectItem>
+                <SelectItem value="gl">Galician</SelectItem>
+                <SelectItem value="de">German</SelectItem>
+                <SelectItem value="el">Greek</SelectItem>
+                <SelectItem value="he">Hebrew</SelectItem>
+                <SelectItem value="hi">Hindi</SelectItem>
+                <SelectItem value="hu">Hungarian</SelectItem>
+                <SelectItem value="is">Icelandic</SelectItem>
+                <SelectItem value="id">Indonesian</SelectItem>
+                <SelectItem value="it">Italian</SelectItem>
+                <SelectItem value="ja">Japanese</SelectItem>
+                <SelectItem value="kn">Kannada</SelectItem>
+                <SelectItem value="kk">Kazakh</SelectItem>
+                <SelectItem value="ko">Korean</SelectItem>
+                <SelectItem value="lv">Latvian</SelectItem>
+                <SelectItem value="lt">Lithuanian</SelectItem>
+                <SelectItem value="mk">Macedonian</SelectItem>
+                <SelectItem value="ms">Malay</SelectItem>
+                <SelectItem value="mr">Marathi</SelectItem>
+                <SelectItem value="mi">Maori</SelectItem>
+                <SelectItem value="ne">Nepali</SelectItem>
+                <SelectItem value="no">Norwegian</SelectItem>
+                <SelectItem value="fa">Persian</SelectItem>
+                <SelectItem value="pl">Polish</SelectItem>
+                <SelectItem value="pt">Portuguese</SelectItem>
+                <SelectItem value="ro">Romanian</SelectItem>
+                <SelectItem value="ru">Russian</SelectItem>
+                <SelectItem value="sr">Serbian</SelectItem>
+                <SelectItem value="sk">Slovak</SelectItem>
+                <SelectItem value="sl">Slovenian</SelectItem>
+                <SelectItem value="es">Spanish</SelectItem>
+                <SelectItem value="sw">Swahili</SelectItem>
+                <SelectItem value="sv">Swedish</SelectItem>
+                <SelectItem value="tl">Tagalog</SelectItem>
+                <SelectItem value="ta">Tamil</SelectItem>
+                <SelectItem value="th">Thai</SelectItem>
+                <SelectItem value="tr">Turkish</SelectItem>
+                <SelectItem value="uk">Ukrainian</SelectItem>
+                <SelectItem value="ur">Urdu</SelectItem>
+                <SelectItem value="vi">Vietnamese</SelectItem>
+                <SelectItem value="cy">Welsh</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button
+            className="w-full"
+            onClick={handleSubmit}
+            disabled={!file || isLoading}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Transcribing...
+              </>
+            ) : (
+              'Start Transcription'
+            )}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
-  );
+  )
 }
